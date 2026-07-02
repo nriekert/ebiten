@@ -18,7 +18,7 @@ allowed-tools: Read, Edit, Write, Bash
 
 # run-ebitengine-app-headless skill
 
-*Targets ebiten commit `c8db8fd6d` (2026-06-30), verified against it.
+*Targets ebiten commit `de81775da` (2026-07-02), verified against it.
 `exp/vmhost` is experimental, so if its API has moved since, the driver and
 the snippets here may need updating.*
 
@@ -151,6 +151,10 @@ d.guest.ReleaseTouch(0)
 d.guest.UpdateGamepads([]vmhost.GamepadState{ /* ... */ })
 ```
 
+Tick counts are in the guest's own time units — see
+[Ticks and TPS](#ticks-and-tps) to convert seconds of app time into
+`AdvanceTicks` counts.
+
 Example — use `-ticks` as the total run length, settle 30 ticks, hold a
 click for one tick, then run the remaining ticks — as the `INPUT SCRIPT`
 block. For shorter total runs, reduce the settle count first.
@@ -207,6 +211,24 @@ backlog; ticks coalesce, so queuing many is cheap.
 out; a panicking guest prints its stack to stderr and the driver stops. The
 driver also puts a deadline on accepting the guest connection so a guest that
 never dials the host fails instead of hanging indefinitely.
+
+## Ticks and TPS
+
+A tick is one guest `Update` call, and `AdvanceTicks(n)` runs exactly n of
+them. The guest's TPS never throttles or scales this — how many ticks to run,
+and at what real-time rate if any, is entirely the host's choice.
+
+TPS matters as a unit conversion. The guest's game logic is written assuming
+`Update` runs TPS times per second of real time, so its timers, animations,
+and cooldowns count in those units. `d.guest.RequestedTPS()` reports what the
+game requested via `ebiten.SetTPS` (the standard 60 until changed). To
+simulate a duration of app time, multiply seconds by that value: one second
+in a 30-TPS game is `AdvanceTicks(30)`, not 60.
+
+`RequestedTPS` can also return `ebiten.SyncWithFPS` (-1), meaning the game
+ties its ticks to rendered frames rather than a fixed rate. There is no
+seconds-to-ticks conversion then; treat a tick as a frame and choose counts
+by observing the app.
 
 ## Observing audio
 
